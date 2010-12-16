@@ -43,15 +43,23 @@ namespace CopyDb
 			}
 		}
 
-		public SqlConnection GetConnection (bool createdb)
+		public SqlConnection ConnectToExistingDatabase ()
 		{
 			SqlConnection cn = new SqlConnection(ConnectionString);
 			cn.Open();
-			if (createdb)
-			{
-				using (SqlCommand cmd = new SqlCommand("create database [" + Database + "]", cn))
+			cn.ChangeDatabase(Database);
+			return cn;
+		}
+
+		public SqlConnection ConnectToNewDatabase(bool deleteExisting)
+		{
+			SqlConnection cn = new SqlConnection(ConnectionString);
+			cn.Open();
+			if (deleteExisting)
+				using (SqlCommand cmd = new SqlCommand("if exists (select * from sys.databases where name='" + Database + "') drop database [" + Database + "]", cn))
 					cmd.ExecuteNonQuery();
-			}
+			using (SqlCommand cmd = new SqlCommand("create database [" + Database + "]", cn))
+				cmd.ExecuteNonQuery();
 			cn.ChangeDatabase(Database);
 			return cn;
 		}
@@ -181,20 +189,53 @@ namespace CopyDb
 		[STAThread]
 		static int Main (string[] args)
 		{
-			if (args.Length < 2)
-				return ShowUsage();
-
 			Stopwatch sw = new Stopwatch();
 			sw.Start();
 
-			DbInfo source = new DbInfo(args[0]);
-			DbInfo dest = new DbInfo(args[1]);
+			bool overwriteExistingDatabase = false;
+			DbInfo source = null;
+			DbInfo dest = null;
 
-			using (SqlConnection sourcecn = source.GetConnection(false))
+			var positional = 0;
+			foreach (var arg in args)
+			{
+				if (arg[0] == '-' || arg[0] == '/')
+				{
+					if (arg.Length < 2)
+						return ShowUsage();
+					switch (arg[1])
+					{
+						case '?':
+						case 'h':
+							return ShowUsage();
+						case 'f':
+							overwriteExistingDatabase = true;
+							break;
+						default:
+							return ShowUsage();
+					}
+				}
+				else
+				{
+					switch (++positional)
+					{
+						case 1:
+							source = new DbInfo(arg);
+							break;
+						case 2:
+							dest = new DbInfo(arg);
+							break;
+					}
+				}
+			}
+			if (positional < 2)
+				return ShowUsage();
+
+			using (SqlConnection sourcecn = source.ConnectToExistingDatabase())
 			{
 				IDictionary tables = LoadTableSchema(sourcecn);
 
-				using (SqlConnection destcn = dest.GetConnection(true))
+				using (SqlConnection destcn = dest.ConnectToNewDatabase(overwriteExistingDatabase))
 				{
 					foreach (TableInfo table in tables.Values)
 					{
@@ -460,6 +501,7 @@ namespace CopyDb
 		private static int ShowUsage ()
 		{
 			Console.WriteLine("Usage: CopyDb fromServer;fromDb[;usr;pwd] toServer;toDb[;usr;pwd]");
+			Console.WriteLine("\t-f\tForce overwriting existing destination database");
 			return 1;
 		}
 	}
