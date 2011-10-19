@@ -8,7 +8,7 @@ using System.Reflection;
 [assembly: AssemblyTitle("CopyDb")]
 [assembly: AssemblyDescription("Utility to copy a SQL database")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("VersionOne LLC")]
+[assembly: AssemblyCompany("VersionOne")]
 [assembly: AssemblyProduct("")]
 [assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
@@ -25,7 +25,7 @@ using System.Reflection;
 // You can specify all the values or you can default the Revision and Build Numbers 
 // by using the '*' as shown below:
 
-[assembly: AssemblyVersion("1.0.*")]
+[assembly: AssemblyVersion("1.1.2")]
 
 //
 // In order to sign your assembly you must specify a key to use. Refer to the 

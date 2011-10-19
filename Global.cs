@@ -78,8 +78,6 @@ namespace CopyDb
 			Name = name;
 		}
 
-		public TableInfo (object name) : this( (string) name ) {}
-
 		public int ColumnIndex (string name)
 		{
 			for (int i = 0; i < Columns.Count; ++i)
@@ -326,7 +324,7 @@ namespace CopyDb
 			{
 				BulkCopyTimeout = 0,
 				BatchSize = 10000,
-				DestinationTableName = table.Name,
+				DestinationTableName = "[" + table.Name + "]",
 				NotifyAfter = 1000,
 			};
 			copier.SqlRowsCopied += (o, args) => Console.Write(".");
