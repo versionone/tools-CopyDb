@@ -68,8 +68,8 @@ namespace CopyDb
 
 	class TableName
 	{
-		private readonly string Schema;
-		private readonly string Name;
+		public readonly string Schema;
+		public readonly string Name;
 
 		public TableName(string schema, string name)
 		{
@@ -321,8 +321,17 @@ namespace CopyDb
 			}
 		}
 
+		private static void CreateSchemaIfNecessary(string schema, SqlConnection destcn)
+		{
+			StringBuilder s = new StringBuilder(1024);
+			using (TextWriter writer = new StringWriter(s))
+				WriteSchemaDDL(schema, writer);
+			ExecuteSql(destcn, s.ToString());
+		}
+
 		private static void CreateTable (TableInfo table, SqlConnection destcn)
 		{
+			CreateSchemaIfNecessary(table.Name.Schema, destcn);
 			StringBuilder s = new StringBuilder(1024);
 			using (TextWriter writer = new StringWriter(s))
 				WriteTableDDL(table, writer);
@@ -428,7 +437,12 @@ namespace CopyDb
 
 		#region WriteDDL
 
-		private static void WriteTableDDL (TableInfo table, TextWriter writer)
+		private static void WriteSchemaDDL(string schema, TextWriter writer)
+		{
+			writer.Write("if SCHEMA_ID('{0}') is null exec('create schema [{1}]')", schema, schema.Replace("]", "]]"));
+		}
+
+		private static void WriteTableDDL(TableInfo table, TextWriter writer)
 		{
 			writer.WriteLine("CREATE TABLE {0}", table.Name);
 			writer.WriteLine("(");
