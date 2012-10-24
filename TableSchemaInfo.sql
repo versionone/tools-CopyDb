@@ -1,4 +1,5 @@
 SELECT
+	TABLE_SCHEMA SchemaName,
 	TABLE_NAME TableName,
 	COLUMN_NAME ColumnName, 
 	DATA_TYPE Type,
@@ -29,6 +30,7 @@ where o.xtype='U' AND ObjectProperty(o.id, N'IsMSShipped')=0 AND (o.parent_obj=0
 ORDER BY TABLE_NAME, ORDINAL_POSITION
 
 SELECT 
+	SchemaName = kcu.TABLE_SCHEMA,
 	TableName = kcu.TABLE_NAME,
 	ConstraintName = kcu.CONSTRAINT_NAME,
 	IsClustered = cast(INDEXPROPERTY(OBJECT_ID(kcu.TABLE_NAME),kcu.CONSTRAINT_NAME , 'IsClustered') as bit),

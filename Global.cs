@@ -66,14 +66,64 @@ namespace CopyDb
 
 	}
 
+	class TableName
+	{
+		private readonly string Schema;
+		private readonly string Name;
+
+		public TableName(string schema, string name)
+		{
+			Schema = schema;
+			Name = name;
+		}
+
+		public override string ToString()
+		{
+			return FullyQualifiedName;
+		}
+
+		public string FullyQualifiedName
+		{
+			get { return Quoted(Schema) + "." + Quoted(Name); }
+		}
+
+		private string Quoted(string name)
+		{
+			return "[" + name.Replace("]", "]]") + "]";
+		}
+
+		public bool Equals(TableName other)
+		{
+			if (ReferenceEquals(null, other)) return false;
+			if (ReferenceEquals(this, other)) return true;
+			return Equals(other.Schema, Schema) && Equals(other.Name, Name);
+		}
+
+		public override bool Equals(object obj)
+		{
+			if (ReferenceEquals(null, obj)) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != typeof(TableName)) return false;
+			return Equals((TableName) obj);
+		}
+
+		public override int GetHashCode()
+		{
+			unchecked
+			{
+				return ((Schema != null ? Schema.GetHashCode() : 0)*397) ^ (Name != null ? Name.GetHashCode() : 0);
+			}
+		}
+	}
+
 	class TableInfo
 	{
-		public readonly string Name;
+		public readonly TableName Name;
 		public readonly IList Columns = new ArrayList();
 		public KeyInfo PrimaryKey;
 		public bool HasIdentity;
 
-		public TableInfo (string name)
+		public TableInfo (TableName name)
 		{
 			Name = name;
 		}
@@ -90,7 +140,7 @@ namespace CopyDb
 		{
 			return (ColumnInfo) Columns[index];
 		}
-		}
+	}
 
 	class ColumnInfo
 	{
@@ -223,7 +273,7 @@ namespace CopyDb
 				{
 					foreach (TableInfo table in tables.Values)
 					{
-						Console.Write("Table " + table.Name);
+						Console.Write(table.Name);
 						CreateTable(table, destcn);
 						PreCopyTable(table, destcn);
 						CopyTable(table, sourcecn, destcn);
@@ -282,20 +332,20 @@ namespace CopyDb
 		private static void PreCopyTable (TableInfo table, SqlConnection destcn)
 		{
 			if (table.HasIdentity)
-				ExecuteSql(destcn, string.Format("set IDENTITY_INSERT [{0}] on", table.Name));
+				ExecuteSql(destcn, string.Format("set IDENTITY_INSERT {0} on", table.Name));
 		}
 
 		private static void PostCopyTable (TableInfo table, SqlConnection destcn)
 		{
 			if (table.HasIdentity)
-				ExecuteSql(destcn, string.Format("set IDENTITY_INSERT [{0}] off", table.Name));
+				ExecuteSql(destcn, string.Format("set IDENTITY_INSERT {0} off", table.Name));
 		}
 
 		private static void CopyTable (TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
 		{
 			string columnlist = GenerateColumns(table);
 
-			string selectsql = string.Format("select {0} from [{1}]", columnlist, table.Name);
+			string selectsql = string.Format("select {0} from {1}", columnlist, table.Name);
 			using (SqlCommand selectcmd = Command.Sql.Create(sourcecn, selectsql))
 			using (SqlDataReader dr = selectcmd.ExecuteReader(CommandBehavior.SingleResult | CommandBehavior.SequentialAccess))
 			using (var copier = GetCopier(destcn, table))
@@ -310,7 +360,7 @@ namespace CopyDb
 			{
 				BulkCopyTimeout = 0,
 				BatchSize = 10000,
-				DestinationTableName = "[" + table.Name + "]",
+				DestinationTableName = table.Name.ToString(),
 				NotifyAfter = 1000,
 			};
 			copier.SqlRowsCopied += (o, args) => Console.Write(".");
@@ -334,13 +384,13 @@ namespace CopyDb
 			return tables;
 		}
 
-		private static TableInfo LoadTableInfo (IDictionary tables, string tablename)
+		private static TableInfo LoadTableInfo (IDictionary tables, TableName tablename)
 		{
 			TableInfo table = (TableInfo) tables[ tablename ];
 			if (table == null)
 			{
 				table = new TableInfo(tablename);
-				tables.Add(table.Name,  table);
+				tables.Add(table.Name, table);
 			}
 			return table;
 		}
@@ -349,7 +399,8 @@ namespace CopyDb
 		{
 			while (dr.Read())
 			{
-				TableInfo table = LoadTableInfo(tables, (string) dr["TableName"]);
+				TableName tablename = new TableName((string) dr["SchemaName"], (string) dr["TableName"]);
+				TableInfo table = LoadTableInfo(tables, tablename);
 				ColumnInfo column = new ColumnInfo(dr["ColumnName"], dr["Type"], dr["Size"], dr["Precision"], dr["Scale"], dr["IsNullable"], dr["IsIdentity"], dr["IdentitySeed"], dr["IdentityIncrement"], dr["Calculation"], dr["Position"], dr["Collation"]);
 				table.Columns.Add(column);
 				table.HasIdentity |= column.IsIdentity;
@@ -360,7 +411,8 @@ namespace CopyDb
 		{
 			while (dr.Read())
 			{
-				TableInfo table = LoadTableInfo(tables, (string) dr["TableName"]);
+				TableName tablename = new TableName((string) dr["SchemaName"], (string) dr["TableName"]);
+				TableInfo table = LoadTableInfo(tables, tablename);
 				KeyInfo primarykey = table.PrimaryKey;
 				if (primarykey == null)
 				{
@@ -378,7 +430,7 @@ namespace CopyDb
 
 		private static void WriteTableDDL (TableInfo table, TextWriter writer)
 		{
-			writer.WriteLine("CREATE TABLE [{0}]", table.Name);
+			writer.WriteLine("CREATE TABLE {0}", table.Name);
 			writer.WriteLine("(");
 			WriteColumnsDDL(table.Columns, writer);
 			WritePrimaryKeyDDL(table.PrimaryKey, writer);
