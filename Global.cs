@@ -90,21 +90,7 @@ namespace CopyDb
 		{
 			return (ColumnInfo) Columns[index];
 		}
-
-		private class _Comparer : IComparer
-		{
-			public int Compare (object x, object y)
-			{
-				return Compare((TableInfo) x, (TableInfo) y);
-			}
-
-			private static int Compare (TableInfo x, TableInfo y)
-			{
-				return string.Compare(x.Name, y.Name);
-			}
 		}
-		public static readonly IComparer Comparer = new _Comparer();
-	}
 
 	class ColumnInfo
 	{
@@ -389,11 +375,6 @@ namespace CopyDb
 		#endregion
 
 		#region WriteDDL
-		private static void WriteTablesDDL (ICollection tables, TextWriter writer)
-		{
-			foreach (TableInfo table in tables)
-				WriteTableDDL(table, writer);
-		}
 
 		private static void WriteTableDDL (TableInfo table, TextWriter writer)
 		{
