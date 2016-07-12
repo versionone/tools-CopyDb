@@ -24,8 +24,10 @@ SELECT
 	Collation = COLLATION_NAME
 FROM INFORMATION_SCHEMA.COLUMNS 
 JOIN sys.objects o on o.name=TABLE_NAME and o.schema_id=SCHEMA_ID(TABLE_SCHEMA)
+left join sys.extended_properties e on class=1 and e.major_id=o.object_id and e.minor_id=0 and e.name=N'microsoft_database_tools_support'
 LEFT JOIN syscomments com on com.id=OBJECT_ID(TABLE_NAME) AND com.number=ORDINAL_POSITION
 where o.type='U' AND ObjectProperty(o.object_id, N'IsMSShipped')=0 AND (o.parent_object_id=0 OR ObjectProperty(o.parent_object_id, N'IsMSShipped')=0)
+	and isnull(e.value, 0)<>1
 --where TABLE_NAME=@tablename
 ORDER BY TABLE_NAME, ORDINAL_POSITION
 
