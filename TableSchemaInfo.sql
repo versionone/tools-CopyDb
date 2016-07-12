@@ -42,7 +42,11 @@ SELECT
 FROM 
 	INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
 	JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc ON tc.CONSTRAINT_NAME=kcu.CONSTRAINT_NAME
+	join sys.objects o on o.name=kcu.TABLE_NAME and o.schema_id=SCHEMA_ID(kcu.TABLE_SCHEMA)
+	left join sys.extended_properties e on class=1 and e.major_id=o.object_id and e.minor_id=0 and e.name=N'microsoft_database_tools_support'
 WHERE 
 	tc.CONSTRAINT_TYPE='PRIMARY KEY'
+	and o.type='U' AND ObjectProperty(o.object_id, N'IsMSShipped')=0 AND (o.parent_object_id=0 OR ObjectProperty(o.parent_object_id, N'IsMSShipped')=0)
+	and isnull(e.value, 0)<>1
 --	and kcu.TABLE_NAME=@tablename
 ORDER BY kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
