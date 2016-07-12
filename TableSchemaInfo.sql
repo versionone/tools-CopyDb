@@ -23,9 +23,9 @@ SELECT
 	cast(ORDINAL_POSITION as int) Position,
 	Collation = COLLATION_NAME
 FROM INFORMATION_SCHEMA.COLUMNS 
-JOIN sysobjects o on o.name=TABLE_NAME
+JOIN sys.objects o on o.name=TABLE_NAME and o.schema_id=SCHEMA_ID(TABLE_SCHEMA)
 LEFT JOIN syscomments com on com.id=OBJECT_ID(TABLE_NAME) AND com.number=ORDINAL_POSITION
-where o.xtype='U' AND ObjectProperty(o.id, N'IsMSShipped')=0 AND (o.parent_obj=0 OR ObjectProperty(o.parent_obj, N'IsMSShipped')=0)
+where o.type='U' AND ObjectProperty(o.object_id, N'IsMSShipped')=0 AND (o.parent_object_id=0 OR ObjectProperty(o.parent_object_id, N'IsMSShipped')=0)
 --where TABLE_NAME=@tablename
 ORDER BY TABLE_NAME, ORDINAL_POSITION
 
