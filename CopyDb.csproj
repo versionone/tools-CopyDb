@@ -103,6 +103,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ColumnInfo.cs" />
+    <Compile Include="KeyInfo.cs" />
+    <Compile Include="TableInfo.cs" />
+    <Compile Include="TableName.cs" />
     <Content Include="App.ico" />
     <Compile Include="AssemblyInfo.cs">
       <SubType>Code</SubType>
@@ -111,6 +115,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Copier.cs" />
+    <Compile Include="DbInfo.cs" />
     <Compile Include="Global.cs">
       <SubType>Code</SubType>
     </Compile>
