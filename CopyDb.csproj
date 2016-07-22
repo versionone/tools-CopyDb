@@ -110,6 +110,7 @@
     <Compile Include="Command.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Copier.cs" />
     <Compile Include="Global.cs">
       <SubType>Code</SubType>
     </Compile>
