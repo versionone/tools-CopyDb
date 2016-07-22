@@ -32,9 +32,7 @@ namespace CopyDb
 				var tables = LoadTableSchema(sourcecn);
 				_queue = new Queue<TableInfo>(tables.Values);
 			}
-			using (SqlConnection destcn = _dest.ConnectToNewDatabase(_overwriteExistingDatabase))
-			{
-			}
+			_dest.CreateDatabase(_overwriteExistingDatabase);
 
 			var threads = new Thread[ThreadCount];
 			for (var i = 0; i < threads.Length; ++i)

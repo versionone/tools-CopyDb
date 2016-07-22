@@ -47,17 +47,20 @@ namespace CopyDb
 			return cn;
 		}
 
-		public SqlConnection ConnectToNewDatabase(bool deleteExisting)
+		public void CreateDatabase(bool deleteExisting)
 		{
-			SqlConnection cn = new SqlConnection(ConnectionString);
-			cn.Open();
-			if (deleteExisting)
-				using (SqlCommand cmd = new SqlCommand("if exists (select * from sys.databases where name='" + Database + "') drop database [" + Database + "]", cn))
+			using (SqlConnection cn = new SqlConnection(ConnectionString))
+			{
+				cn.Open();
+				if (deleteExisting)
+					using (
+						SqlCommand cmd =
+							new SqlCommand(
+								"if exists (select * from sys.databases where name='" + Database + "') drop database [" + Database + "]", cn))
+						cmd.ExecuteNonQuery();
+				using (SqlCommand cmd = new SqlCommand("create database [" + Database + "]", cn))
 					cmd.ExecuteNonQuery();
-			using (SqlCommand cmd = new SqlCommand("create database [" + Database + "]", cn))
-				cmd.ExecuteNonQuery();
-			cn.ChangeDatabase(Database);
-			return cn;
+			}
 		}
 
 	}
