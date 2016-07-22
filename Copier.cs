@@ -109,7 +109,7 @@ namespace CopyDb
 
 		private void CopyTable(TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
 		{
-			Console.Write(table.Name);
+			Console.Write(" " + table.Name.Name + " ");
 			CreateTable(table, destcn);
 			PreCopyTable(table, destcn);
 			CopyTableData(table, sourcecn, destcn);
