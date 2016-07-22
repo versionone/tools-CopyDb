@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -120,7 +119,7 @@ namespace CopyDb
 	class TableInfo
 	{
 		public readonly TableName Name;
-		public readonly IList Columns = new ArrayList();
+		public readonly IList<ColumnInfo> Columns = new List<ColumnInfo>();
 		public KeyInfo PrimaryKey;
 		public bool HasIdentity;
 
@@ -132,14 +131,14 @@ namespace CopyDb
 		public int ColumnIndex (string name)
 		{
 			for (int i = 0; i < Columns.Count; ++i)
-				if ( ((ColumnInfo)Columns[i]).Name == name)
+				if (Columns[i].Name == name)
 					return i;
 			return -1;
 		}
 
 		public ColumnInfo Column (int index)
 		{
-			return (ColumnInfo) Columns[index];
+			return Columns[index];
 		}
 	}
 
@@ -202,7 +201,7 @@ namespace CopyDb
 	{
 		public readonly string Name;
 		public readonly bool IsClustered;
-		public readonly IList Columns = new ArrayList();
+		public readonly IList<ColumnInfo> Columns = new List<ColumnInfo>();
 
 		public KeyInfo (string name, bool isclustered)
 		{
@@ -416,7 +415,7 @@ namespace CopyDb
 					primarykey = new KeyInfo(dr["ConstraintName"], dr["IsClustered"]);
 					table.PrimaryKey = primarykey;
 				}
-				ColumnInfo column = (ColumnInfo) table.Columns[ table.ColumnIndex( (string) dr["ColumnName"]) ];
+				ColumnInfo column = table.Columns[ table.ColumnIndex( (string) dr["ColumnName"]) ];
 				column.IsDescending = dr["IsDescending"].Equals(1);
 				primarykey.Columns.Add(column);
 			}
@@ -440,7 +439,7 @@ namespace CopyDb
 			writer.WriteLine(")");
 		}
 
-		private static void WriteColumnsDDL (ICollection columns, TextWriter writer)
+		private static void WriteColumnsDDL (IEnumerable<ColumnInfo> columns, TextWriter writer)
 		{
 			bool needcomma = false;
 			foreach (ColumnInfo column in columns)
@@ -489,7 +488,7 @@ namespace CopyDb
 			writer.Write(" )");
 		}
 
-		private static void WritePrimaryKeyColumnsDDL (ICollection columns, TextWriter writer)
+		private static void WritePrimaryKeyColumnsDDL (IEnumerable<ColumnInfo> columns, TextWriter writer)
 		{
 			bool needcomma = false;
 			foreach (ColumnInfo column in columns)
