@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace CopyDb
 {
@@ -13,6 +14,8 @@ namespace CopyDb
 		private readonly DbInfo _dest;
 		private readonly bool _overwriteExistingDatabase;
 		private Queue<TableInfo> _queue;
+		private volatile bool _abort = false;
+		private Exception _exception;
 
 		public Copier(DbInfo source, DbInfo dest, bool overwriteExistingDatabase)
 		{
@@ -32,21 +35,24 @@ namespace CopyDb
 			{
 			}
 
-			var ex = TryCopyLoop();
-			if (ex != null)
-				throw ex;
+			var thread1 = new Thread(TryCopyLoop);
+			thread1.Start();
+			thread1.Join();
+
+			if (_exception != null)
+				throw _exception;
 		}
 
-		private Exception TryCopyLoop()
+		private void TryCopyLoop()
 		{
 			try
 			{
 				CopyLoop();
-				return null;
 			}
 			catch (Exception ex)
 			{
-				return ex;
+				_abort = true;
+				_exception = ex;
 			}
 		}
 
@@ -55,7 +61,7 @@ namespace CopyDb
 			using (SqlConnection sourcecn = _source.ConnectToExistingDatabase())
 			using (SqlConnection destcn = _dest.ConnectToExistingDatabase())
 			{
-				while (true)
+				while (!_abort)
 				{
 					TableInfo table;
 					try
@@ -65,7 +71,7 @@ namespace CopyDb
 					}
 					catch (InvalidOperationException)
 					{
-						return;
+						return;	// queue is empty
 					}
 					CopyTable(table, sourcecn, destcn);
 				}
@@ -96,7 +102,7 @@ namespace CopyDb
 			ExecuteSql(destcn, s.ToString());
 		}
 
-		private static void CopyTable(TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
+		private void CopyTable(TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
 		{
 			Console.Write(table.Name);
 			CreateTable(table, destcn);
@@ -126,7 +132,7 @@ namespace CopyDb
 				ExecuteSql(destcn, String.Format("set IDENTITY_INSERT {0} off", table.Name));
 		}
 
-		private static void CopyTableData(TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
+		private void CopyTableData(TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
 		{
 			string columnlist = GenerateColumns(table);
 
@@ -139,7 +145,7 @@ namespace CopyDb
 			}
 		}
 
-		private static SqlBulkCopy GetCopier(SqlConnection destcn, TableInfo table)
+		private SqlBulkCopy GetCopier(SqlConnection destcn, TableInfo table)
 		{
 			SqlBulkCopy copier = new SqlBulkCopy(destcn, SqlBulkCopyOptions.TableLock | SqlBulkCopyOptions.KeepIdentity, null)
 			{
@@ -148,8 +154,16 @@ namespace CopyDb
 				DestinationTableName = table.Name.ToString(),
 				NotifyAfter = 1000,
 			};
-			copier.SqlRowsCopied += (o, args) => Console.Write(".");
+			copier.SqlRowsCopied += this.OnSqlRowsCopied;
 			return copier;
+		}
+
+		private void OnSqlRowsCopied(object o, SqlRowsCopiedEventArgs args)
+		{
+			if (_abort)
+				args.Abort = true;
+			else
+				Console.Write(".");
 		}
 
 		#region Load
