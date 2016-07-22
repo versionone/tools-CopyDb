@@ -273,35 +273,13 @@ namespace CopyDb
 				{
 					foreach (TableInfo table in tables.Values)
 					{
-						Console.Write(table.Name);
-						CreateTable(table, destcn);
-						PreCopyTable(table, destcn);
 						CopyTable(table, sourcecn, destcn);
-						PostCopyTable(table, destcn);
-						Console.WriteLine();
 					}
-/*
-				TableInfo[] atables = new TableInfo[tables.Count];
-				tables.Values.CopyTo(atables, 0);
-				Array.Sort(atables, TableInfo.Comparer);
-				WriteTablesDDL(atables, Console.Out);
-*/
-//					WriteTablesDDL(tables.Values, Console.Out);
-//					WriteTablesDML(tables.Values,  sourcecn, Console.Out);
-
-/*
-				Schema.Descriptor[] tables = Schema.GetObjectNames(new ObjectType[] {ObjectType.Table}, sourcecn, null);
-				Array.Sort(tables, Schema.Descriptor.Comparer);
-				foreach (Schema.Descriptor table in tables)
-				{
-					Scripter.Script(table, Console.Out, sourcecn, null);
-				}
-*/
 				}
 			}
 
 			sw.Stop();
-			Console.WriteLine("Elapsed time = {0:0.000} seconds", sw.Elapsed.TotalSeconds);
+			Console.WriteLine("\n\nElapsed time = {0:0.000} seconds", sw.Elapsed.TotalSeconds);
 			return 0;
 		}
 
@@ -329,6 +307,15 @@ namespace CopyDb
 			ExecuteSql(destcn, s.ToString());
 		}
 
+		private static void CopyTable(TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
+		{
+			Console.Write(table.Name);
+			CreateTable(table, destcn);
+			PreCopyTable(table, destcn);
+			CopyTableData(table, sourcecn, destcn);
+			PostCopyTable(table, destcn);
+		}
+
 		private static void CreateTable (TableInfo table, SqlConnection destcn)
 		{
 			CreateSchemaIfNecessary(table.Name.Schema, destcn);
@@ -350,7 +337,7 @@ namespace CopyDb
 				ExecuteSql(destcn, string.Format("set IDENTITY_INSERT {0} off", table.Name));
 		}
 
-		private static void CopyTable (TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
+		private static void CopyTableData (TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
 		{
 			string columnlist = GenerateColumns(table);
 
