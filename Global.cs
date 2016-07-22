@@ -51,7 +51,8 @@ namespace CopyDb
 
 			try
 			{
-				return new Copier(source, dest, overwriteExistingDatabase).Run();
+				new Copier(source, dest, overwriteExistingDatabase).Run();
+				return 0;
 			}
 			finally
 			{

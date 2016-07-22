@@ -12,6 +12,7 @@ namespace CopyDb
 		private readonly DbInfo _source;
 		private readonly DbInfo _dest;
 		private readonly bool _overwriteExistingDatabase;
+		private Queue<TableInfo> _queue;
 
 		public Copier(DbInfo source, DbInfo dest, bool overwriteExistingDatabase)
 		{
@@ -20,24 +21,58 @@ namespace CopyDb
 			_overwriteExistingDatabase = overwriteExistingDatabase;
 		}
 
-		public int Run()
+		public void Run()
 		{
 			using (SqlConnection sourcecn = _source.ConnectToExistingDatabase())
 			{
 				var tables = LoadTableSchema(sourcecn);
-
-				using (SqlConnection destcn = _dest.ConnectToNewDatabase(_overwriteExistingDatabase))
-				{
-					foreach (TableInfo table in tables.Values)
-					{
-						CopyTable(table, sourcecn, destcn);
-					}
-				}
+				_queue = new Queue<TableInfo>(tables.Values);
 			}
-			return 0;
+			using (SqlConnection destcn = _dest.ConnectToNewDatabase(_overwriteExistingDatabase))
+			{
+			}
+
+			var ex = TryCopyLoop();
+			if (ex != null)
+				throw ex;
 		}
 
-		private static void ExecuteSql (SqlConnection destcn, string sql)
+		private Exception TryCopyLoop()
+		{
+			try
+			{
+				CopyLoop();
+				return null;
+			}
+			catch (Exception ex)
+			{
+				return ex;
+			}
+		}
+
+		private void CopyLoop()
+		{
+			using (SqlConnection sourcecn = _source.ConnectToExistingDatabase())
+			using (SqlConnection destcn = _dest.ConnectToExistingDatabase())
+			{
+				while (true)
+				{
+					TableInfo table;
+					try
+					{
+						lock (_queue)
+							table = _queue.Dequeue();
+					}
+					catch (InvalidOperationException)
+					{
+						return;
+					}
+					CopyTable(table, sourcecn, destcn);
+				}
+			}
+		}
+
+		private static void ExecuteSql(SqlConnection destcn, string sql)
 		{
 			using (SqlCommand cmd = Command.Sql.Create(destcn, sql))
 			{
@@ -70,7 +105,7 @@ namespace CopyDb
 			PostCopyTable(table, destcn);
 		}
 
-		private static void CreateTable (TableInfo table, SqlConnection destcn)
+		private static void CreateTable(TableInfo table, SqlConnection destcn)
 		{
 			CreateSchemaIfNecessary(table.Name.Schema, destcn);
 			StringBuilder s = new StringBuilder(1024);
@@ -79,19 +114,19 @@ namespace CopyDb
 			ExecuteSql(destcn, s.ToString());
 		}
 
-		private static void PreCopyTable (TableInfo table, SqlConnection destcn)
+		private static void PreCopyTable(TableInfo table, SqlConnection destcn)
 		{
 			if (table.HasIdentity)
 				ExecuteSql(destcn, String.Format("set IDENTITY_INSERT {0} on", table.Name));
 		}
 
-		private static void PostCopyTable (TableInfo table, SqlConnection destcn)
+		private static void PostCopyTable(TableInfo table, SqlConnection destcn)
 		{
 			if (table.HasIdentity)
 				ExecuteSql(destcn, String.Format("set IDENTITY_INSERT {0} off", table.Name));
 		}
 
-		private static void CopyTableData (TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
+		private static void CopyTableData(TableInfo table, SqlConnection sourcecn, SqlConnection destcn)
 		{
 			string columnlist = GenerateColumns(table);
 
@@ -119,7 +154,7 @@ namespace CopyDb
 
 		#region Load
 
-		private static IDictionary<TableName, TableInfo> LoadTableSchema (SqlConnection sourcecn)
+		private static IDictionary<TableName, TableInfo> LoadTableSchema(SqlConnection sourcecn)
 		{
 			var tables = new Dictionary<TableName, TableInfo>();
 			string sql = Resource.LoadString("TableSchemaInfo.sql");
@@ -135,7 +170,7 @@ namespace CopyDb
 			return tables;
 		}
 
-		private static TableInfo LoadTableInfo (IDictionary<TableName, TableInfo> tables, TableName tablename)
+		private static TableInfo LoadTableInfo(IDictionary<TableName, TableInfo> tables, TableName tablename)
 		{
 			TableInfo table;
 			if (!tables.TryGetValue(tablename, out table))
@@ -146,11 +181,11 @@ namespace CopyDb
 			return table;
 		}
 
-		private static void LoadColumnInfo (SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
+		private static void LoadColumnInfo(SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
 		{
 			while (dr.Read())
 			{
-				TableName tablename = new TableName((string) dr["SchemaName"], (string) dr["TableName"]);
+				TableName tablename = new TableName((string)dr["SchemaName"], (string)dr["TableName"]);
 				TableInfo table = LoadTableInfo(tables, tablename);
 				ColumnInfo column = new ColumnInfo(dr["ColumnName"], dr["Type"], dr["Size"], dr["Precision"], dr["Scale"], dr["IsNullable"], dr["IsIdentity"], dr["IdentitySeed"], dr["IdentityIncrement"], dr["Calculation"], dr["Position"], dr["Collation"]);
 				table.Columns.Add(column);
@@ -158,11 +193,11 @@ namespace CopyDb
 			}
 		}
 
-		private static void LoadPrimaryKeyInfo (SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
+		private static void LoadPrimaryKeyInfo(SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
 		{
 			while (dr.Read())
 			{
-				TableName tablename = new TableName((string) dr["SchemaName"], (string) dr["TableName"]);
+				TableName tablename = new TableName((string)dr["SchemaName"], (string)dr["TableName"]);
 				TableInfo table = LoadTableInfo(tables, tablename);
 				KeyInfo primarykey = table.PrimaryKey;
 				if (primarykey == null)
@@ -170,7 +205,7 @@ namespace CopyDb
 					primarykey = new KeyInfo(dr["ConstraintName"], dr["IsClustered"]);
 					table.PrimaryKey = primarykey;
 				}
-				ColumnInfo column = table.Columns[ table.ColumnIndex( (string) dr["ColumnName"]) ];
+				ColumnInfo column = table.Columns[table.ColumnIndex((string)dr["ColumnName"])];
 				column.IsDescending = dr["IsDescending"].Equals(1);
 				primarykey.Columns.Add(column);
 			}
@@ -195,7 +230,7 @@ namespace CopyDb
 			writer.WriteLine(")");
 		}
 
-		private static void WriteColumnsDDL (IEnumerable<ColumnInfo> columns, TextWriter writer)
+		private static void WriteColumnsDDL(IEnumerable<ColumnInfo> columns, TextWriter writer)
 		{
 			bool needcomma = false;
 			foreach (ColumnInfo column in columns)
@@ -208,7 +243,7 @@ namespace CopyDb
 			}
 		}
 
-		private static void WriteColumnDDL (ColumnInfo column, TextWriter writer)
+		private static void WriteColumnDDL(ColumnInfo column, TextWriter writer)
 		{
 			writer.Write("\t[{0}] ", column.Name);
 
@@ -223,9 +258,9 @@ namespace CopyDb
 					writer.Write("({0},{1})", column.Precision, column.Scale);
 				if (column.Collation != null)
 					writer.Write(" COLLATE {0}", column.Collation);
-				writer.Write(column.IsNullable? " NULL": " NOT NULL");
+				writer.Write(column.IsNullable ? " NULL" : " NOT NULL");
 				if (column.IsIdentity)
-					writer.Write(" IDENTITY({0},{1})", column.IdentitySeed,  column.IdentityIncrement);
+					writer.Write(" IDENTITY({0},{1})", column.IdentitySeed, column.IdentityIncrement);
 			}
 			else
 			{
@@ -233,18 +268,18 @@ namespace CopyDb
 			}
 		}
 
-		private static void WritePrimaryKeyDDL (KeyInfo primarykey, TextWriter writer)
+		private static void WritePrimaryKeyDDL(KeyInfo primarykey, TextWriter writer)
 		{
 			if (primarykey == null) return;
 			writer.WriteLine(",");
 			writer.Write("\tCONSTRAINT [{0}] PRIMARY KEY", primarykey.Name);
-			writer.Write(primarykey.IsClustered? " CLUSTERED": " NONCLUSTERED");
+			writer.Write(primarykey.IsClustered ? " CLUSTERED" : " NONCLUSTERED");
 			writer.Write(" ( ");
-			WritePrimaryKeyColumnsDDL(primarykey.Columns,  writer);
+			WritePrimaryKeyColumnsDDL(primarykey.Columns, writer);
 			writer.Write(" )");
 		}
 
-		private static void WritePrimaryKeyColumnsDDL (IEnumerable<ColumnInfo> columns, TextWriter writer)
+		private static void WritePrimaryKeyColumnsDDL(IEnumerable<ColumnInfo> columns, TextWriter writer)
 		{
 			bool needcomma = false;
 			foreach (ColumnInfo column in columns)
@@ -261,12 +296,12 @@ namespace CopyDb
 		#endregion
 
 		#region Write DML
-		private static string GenerateColumns (TableInfo table)
+		private static string GenerateColumns(TableInfo table)
 		{
 			return GenerateColumns(table, "[{0}]");
 		}
 
-		private static string GenerateColumns (TableInfo table, string format)
+		private static string GenerateColumns(TableInfo table, string format)
 		{
 			StringBuilder s = new StringBuilder(1024);
 			bool needcomma = false;
