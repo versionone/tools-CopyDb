@@ -10,11 +10,12 @@ namespace CopyDb
 {
 	internal class Copier
 	{
+		private const int ThreadCount = 4;
 		private readonly DbInfo _source;
 		private readonly DbInfo _dest;
 		private readonly bool _overwriteExistingDatabase;
 		private Queue<TableInfo> _queue;
-		private volatile bool _abort = false;
+		private volatile bool _abort;
 		private Exception _exception;
 
 		public Copier(DbInfo source, DbInfo dest, bool overwriteExistingDatabase)
@@ -35,9 +36,13 @@ namespace CopyDb
 			{
 			}
 
-			var thread1 = new Thread(TryCopyLoop);
-			thread1.Start();
-			thread1.Join();
+			var threads = new Thread[ThreadCount];
+			for (var i = 0; i < threads.Length; ++i)
+				threads[i] = new Thread(TryCopyLoop);
+			foreach (var thread in threads)
+				thread.Start();
+			foreach (var thread in threads)
+				thread.Join();
 
 			if (_exception != null)
 				throw _exception;
