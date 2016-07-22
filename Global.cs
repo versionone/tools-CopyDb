@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
@@ -176,7 +177,7 @@ namespace CopyDb
 
 		public ColumnInfo (object name, object type, object size, object precision, object scale, object isnullable, object isidentity, object identityseed, object identityincr, object calculation, object position, object collation)
 			: this(
-				(string) name, 
+				(string) name,
 				(SqlDbType) Enum.Parse(typeof(SqlDbType), (string) type, true),
 				size.Equals(DBNull.Value)? -1: (int) size,
 				precision.Equals(DBNull.Value)? -1: (int) precision,
@@ -267,7 +268,7 @@ namespace CopyDb
 
 			using (SqlConnection sourcecn = source.ConnectToExistingDatabase())
 			{
-				IDictionary tables = LoadTableSchema(sourcecn);
+				var tables = LoadTableSchema(sourcecn);
 
 				using (SqlConnection destcn = dest.ConnectToNewDatabase(overwriteExistingDatabase))
 				{
@@ -364,9 +365,9 @@ namespace CopyDb
 		}
 
 		#region Load
-		private static IDictionary LoadTableSchema (SqlConnection sourcecn)
+		private static IDictionary<TableName, TableInfo> LoadTableSchema (SqlConnection sourcecn)
 		{
-			Hashtable tables = new Hashtable();
+			var tables = new Dictionary<TableName, TableInfo>();
 			string sql = Resource.LoadString("TableSchemaInfo.sql");
 			using (SqlCommand cmd = Command.Sql.Create(sourcecn, sql))
 			{
@@ -380,10 +381,10 @@ namespace CopyDb
 			return tables;
 		}
 
-		private static TableInfo LoadTableInfo (IDictionary tables, TableName tablename)
+		private static TableInfo LoadTableInfo (IDictionary<TableName, TableInfo> tables, TableName tablename)
 		{
-			TableInfo table = (TableInfo) tables[ tablename ];
-			if (table == null)
+			TableInfo table;
+			if (!tables.TryGetValue(tablename, out table))
 			{
 				table = new TableInfo(tablename);
 				tables.Add(table.Name, table);
@@ -391,7 +392,7 @@ namespace CopyDb
 			return table;
 		}
 
-		private static void LoadColumnInfo (SqlDataReader dr, IDictionary tables)
+		private static void LoadColumnInfo (SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
 		{
 			while (dr.Read())
 			{
@@ -403,7 +404,7 @@ namespace CopyDb
 			}
 		}
 
-		private static void LoadPrimaryKeyInfo (SqlDataReader dr, IDictionary tables)
+		private static void LoadPrimaryKeyInfo (SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
 		{
 			while (dr.Read())
 			{
