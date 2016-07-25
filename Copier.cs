@@ -121,6 +121,16 @@ namespace CopyDb
 			using (TextWriter writer = new StringWriter(s))
 				WriteTableDDL(table, writer);
 			ExecuteSql(destcn, s.ToString());
+			ClusterTable(table, destcn);
+		}
+
+		private static void ClusterTable(TableInfo table, SqlConnection destcn)
+		{
+			StringBuilder s = new StringBuilder(1024);
+			using (TextWriter writer = new StringWriter(s))
+				WriteClusterDDL(table, writer);
+			if (s.Length > 0)
+				ExecuteSql(destcn, s.ToString());
 		}
 
 		private static void PreCopyTable(TableInfo table, SqlConnection destcn)
@@ -219,7 +229,7 @@ namespace CopyDb
 				KeyInfo primarykey = table.PrimaryKey;
 				if (primarykey == null)
 				{
-					primarykey = new KeyInfo(dr["ConstraintName"], dr["IsClustered"]);
+					primarykey = new KeyInfo(dr["ConstraintName"], dr["IsClustered"], dr["IsPrimaryKey"], dr["IsUnique"], dr["IsConstraint"]);
 					table.PrimaryKey = primarykey;
 				}
 				ColumnInfo column = table.Columns[table.ColumnIndex((string)dr["ColumnName"])];
@@ -242,7 +252,6 @@ namespace CopyDb
 			writer.WriteLine("CREATE TABLE {0}", table.Name);
 			writer.WriteLine("(");
 			WriteColumnsDDL(table.Columns, writer);
-			WritePrimaryKeyDDL(table.PrimaryKey, writer);
 			writer.WriteLine();
 			writer.WriteLine(")");
 		}
@@ -285,15 +294,35 @@ namespace CopyDb
 			}
 		}
 
-		private static void WritePrimaryKeyDDL(KeyInfo primarykey, TextWriter writer)
+		private static void WriteClusterDDL(TableInfo table, TextWriter writer)
 		{
-			if (primarykey == null) return;
-			writer.WriteLine(",");
-			writer.Write("\tCONSTRAINT [{0}] PRIMARY KEY", primarykey.Name);
-			writer.Write(primarykey.IsClustered ? " CLUSTERED" : " NONCLUSTERED");
-			writer.Write(" ( ");
-			WritePrimaryKeyColumnsDDL(primarykey.Columns, writer);
-			writer.Write(" )");
+			var cluster = table.PrimaryKey;
+			if (cluster == null) return;
+			if (cluster.IsConstraint)
+			{
+				// alter table <table> add constraint <name> {primary key | unique} {clustered | nonclustered} (<columns>)
+				writer.Write("alter table {0} add constraint [{1}]", table.Name, cluster.Name);
+				if (cluster.IsPrimaryKey)
+					writer.Write(" primary key");
+				else if (cluster.IsUnique)
+					writer.Write(" unique");
+				writer.Write(cluster.IsClustered ? " clustered" : " nonclustered");
+				writer.Write(" (");
+				WritePrimaryKeyColumnsDDL(cluster.Columns, writer);
+				writer.Write(")");
+			}
+			else
+			{
+				// create [unique] {clustered | nonclustered} index <name> on <table> (<columns>)
+				writer.Write("create");
+				if (cluster.IsUnique)
+					writer.Write(" unique");
+				writer.Write(cluster.IsClustered ? " clustered" : " nonclustered");
+				writer.Write(" index [{1}] on {0}", table.Name, cluster.Name);
+				writer.Write(" (");
+				WritePrimaryKeyColumnsDDL(cluster.Columns, writer);
+				writer.Write(")");
+			}
 		}
 
 		private static void WritePrimaryKeyColumnsDDL(IEnumerable<ColumnInfo> columns, TextWriter writer)

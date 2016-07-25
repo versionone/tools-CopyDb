@@ -1,7 +1,7 @@
 SELECT
 	TABLE_SCHEMA SchemaName,
 	TABLE_NAME TableName,
-	COLUMN_NAME ColumnName, 
+	COLUMN_NAME ColumnName,
 	DATA_TYPE Type,
 	Size = CASE
 		WHEN DATA_TYPE IN ('binary','varbinary','char','nchar','varchar','nvarchar')--,'text','ntext','image')
@@ -11,8 +11,8 @@ SELECT
 		WHEN DATA_TYPE IN ('decimal','numeric')
 			THEN cast(NUMERIC_PRECISION as int)
 	END,
-	Scale = CASE 
-		WHEN DATA_TYPE IN ('decimal','numeric') 
+	Scale = CASE
+		WHEN DATA_TYPE IN ('decimal','numeric')
 			THEN cast(NUMERIC_SCALE as int)
 	END,
 	IsNullable = CASE Upper(IS_NULLABLE) WHEN 'NO' THEN cast(0 as bit) ELSE cast(1 as bit) END,
@@ -22,7 +22,7 @@ SELECT
 	Calculation = com.text,
 	cast(ORDINAL_POSITION as int) Position,
 	Collation = COLLATION_NAME
-FROM INFORMATION_SCHEMA.COLUMNS 
+FROM INFORMATION_SCHEMA.COLUMNS
 JOIN sys.objects o on o.name=TABLE_NAME and o.schema_id=SCHEMA_ID(TABLE_SCHEMA)
 left join sys.extended_properties e on class=1 and e.major_id=o.object_id and e.minor_id=0 and e.name=N'microsoft_database_tools_support'
 LEFT JOIN syscomments com on com.id=OBJECT_ID(TABLE_NAME) AND com.number=ORDINAL_POSITION
@@ -31,22 +31,22 @@ where o.type='U' AND ObjectProperty(o.object_id, N'IsMSShipped')=0 AND (o.parent
 --where TABLE_NAME=@tablename
 ORDER BY TABLE_NAME, ORDINAL_POSITION
 
-SELECT 
-	SchemaName = kcu.TABLE_SCHEMA,
-	TableName = kcu.TABLE_NAME,
-	ConstraintName = kcu.CONSTRAINT_NAME,
-	IsClustered = cast(INDEXPROPERTY(OBJECT_ID(kcu.TABLE_NAME),kcu.CONSTRAINT_NAME , 'IsClustered') as bit),
-	ColumnName = kcu.COLUMN_NAME,
-	IsDescending = cast(INDEXKEY_PROPERTY(OBJECT_ID(kcu.TABLE_NAME), INDEXPROPERTY(OBJECT_ID(kcu.TABLE_NAME),kcu.CONSTRAINT_NAME,'IndexID'), ORDINAL_POSITION, 'IsDescending') as bit),
-	kcu.ORDINAL_POSITION Position
-FROM 
-	INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-	JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc ON tc.CONSTRAINT_NAME=kcu.CONSTRAINT_NAME
-	join sys.objects o on o.name=kcu.TABLE_NAME and o.schema_id=SCHEMA_ID(kcu.TABLE_SCHEMA)
-	left join sys.extended_properties e on class=1 and e.major_id=o.object_id and e.minor_id=0 and e.name=N'microsoft_database_tools_support'
-WHERE 
-	tc.CONSTRAINT_TYPE='PRIMARY KEY'
+select
+	SchemaName = schema_name(schema_id),
+	TableName = o.name,
+	ConstraintName = i.name,
+	IsClustered = cast(case when i.type_desc='CLUSTERED' then 1 else 0 end as bit),
+	ColumnName = col_name(c.object_id, c.column_id),
+	IsDescending = c.is_descending_key,
+	Position = c.key_ordinal,
+	IsPrimaryKey = is_primary_key,
+	IsUnique = is_unique,
+	IsConstraint = is_primary_key | is_unique_constraint
+from sys.indexes i
+join sys.objects o on o.object_id=i.object_id
+join sys.index_columns c on c.object_id=i.object_id and c.index_id=i.index_id
+left join sys.extended_properties e on class=1 and e.major_id=o.object_id and e.minor_id=0 and e.name=N'microsoft_database_tools_support'
+where i.type_desc='CLUSTERED'
 	and o.type='U' AND ObjectProperty(o.object_id, N'IsMSShipped')=0 AND (o.parent_object_id=0 OR ObjectProperty(o.parent_object_id, N'IsMSShipped')=0)
 	and isnull(e.value, 0)<>1
---	and kcu.TABLE_NAME=@tablename
-ORDER BY kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
+order by o.name, i.name, c.key_ordinal
