@@ -13,11 +13,18 @@ namespace CopyDb
 		public DbInfo (string arg)
 		{
 			string[] parts = arg.Split(';');
-			if (parts.Length < 2)
+			if (parts.Length < 1)
 				throw new ArgumentException("Argument is not in the format Server;Database[;Username;Password]");
-
-			Server = parts[0];
-			Database = parts[1];
+			if (parts.Length < 2)
+			{
+				Server = ".";
+				Database = parts[0];
+			}
+			else
+			{
+				Server = parts[0];
+				Database = parts[1];
+			}
 
 			if (parts.Length >= 4)
 			{
