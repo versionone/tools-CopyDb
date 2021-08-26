@@ -5,3 +5,4 @@ obj/
 bin/
 !bin/Release/CopyDb.exe
 _ReSharper*/
+.vs/
