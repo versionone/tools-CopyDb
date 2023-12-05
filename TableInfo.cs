@@ -6,7 +6,7 @@ namespace CopyDb
 	{
 		public readonly TableName Name;
 		public readonly IList<ColumnInfo> Columns = new List<ColumnInfo>();
-		public KeyInfo PrimaryKey;
+		public KeyInfo Cluster;
 		public bool HasIdentity;
 
 		public TableInfo (TableName name)
