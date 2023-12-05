@@ -41,7 +41,8 @@ select
 	Position = c.key_ordinal,
 	IsPrimaryKey = is_primary_key,
 	IsUnique = is_unique,
-	IsConstraint = is_primary_key | is_unique_constraint
+	IsConstraint = is_primary_key | is_unique_constraint,
+	IgnoreDupKey = ignore_dup_key
 from sys.indexes i
 join sys.objects o on o.object_id=i.object_id
 join sys.index_columns c on c.object_id=i.object_id and c.index_id=i.index_id

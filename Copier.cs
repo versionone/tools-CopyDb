@@ -229,7 +229,7 @@ namespace CopyDb
 				KeyInfo cluster = table.Cluster;
 				if (cluster == null)
 				{
-					cluster = new KeyInfo(dr["ConstraintName"], dr["IsClustered"], dr["IsPrimaryKey"], dr["IsUnique"], dr["IsConstraint"]);
+					cluster = new KeyInfo(dr["ConstraintName"], dr["IsClustered"], dr["IsPrimaryKey"], dr["IsUnique"], dr["IsConstraint"], dr["IgnoreDupKey"]);
 					table.Cluster = cluster;
 				}
 				ColumnInfo column = table.Columns[table.ColumnIndex((string)dr["ColumnName"])];
@@ -323,6 +323,12 @@ namespace CopyDb
 				WriteClusterColumnsDDL(cluster.Columns, writer);
 				writer.Write(")");
 			}
+
+			// with (IGNORE_DUP_KEY={ON|OFF})
+			writer.Write(" with (");
+			writer.Write("IGNORE_DUP_KEY=");
+			writer.Write(cluster.IgnoreDupKey ? "ON" : "OFF");
+			writer.Write(")");
 		}
 
 		private static void WriteClusterColumnsDDL(IEnumerable<ColumnInfo> columns, TextWriter writer)
