@@ -236,7 +236,8 @@ namespace CopyDb
 						dr["IsUnique"],
 						dr["IsConstraint"],
 						dr["IgnoreDupKey"],
-						dr["FillFactor"]);
+						dr["FillFactor"],
+						dr["PadIndex"]);
 					table.Cluster = cluster;
 				}
 				ColumnInfo column = table.Columns[table.ColumnIndex((string)dr["ColumnName"])];
@@ -340,6 +341,8 @@ namespace CopyDb
 				writer.Write(",FILLFACTOR=");
 				writer.Write(cluster.FillFactor);
 			}
+			writer.Write(",PAD_INDEX=");
+			writer.Write(cluster.PadIndex ? "ON" : "OFF");
 			writer.Write(")");
 		}
 
