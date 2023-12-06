@@ -237,7 +237,9 @@ namespace CopyDb
 						dr["IsConstraint"],
 						dr["IgnoreDupKey"],
 						dr["FillFactor"],
-						dr["PadIndex"]);
+						dr["PadIndex"],
+						dr["AllowRowLocks"],
+						dr["AllowPageLocks"]);
 					table.Cluster = cluster;
 				}
 				ColumnInfo column = table.Columns[table.ColumnIndex((string)dr["ColumnName"])];
@@ -343,6 +345,10 @@ namespace CopyDb
 			}
 			writer.Write(",PAD_INDEX=");
 			writer.Write(cluster.PadIndex ? "ON" : "OFF");
+			writer.Write(",ALLOW_ROW_LOCKS=");
+			writer.Write(cluster.AllowRowLocks ? "ON" : "OFF");
+			writer.Write(",ALLOW_PAGE_LOCKS=");
+			writer.Write(cluster.AllowPageLocks ? "ON" : "OFF");
 			writer.Write(")");
 		}
 
