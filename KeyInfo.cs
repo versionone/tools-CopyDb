@@ -10,9 +10,10 @@ namespace CopyDb
 		public readonly bool IsUnique;
 		public readonly bool IsConstraint;
 		public readonly bool IgnoreDupKey;
+		public readonly byte FillFactor;
 		public readonly IList<ColumnInfo> Columns = new List<ColumnInfo>();
 
-		public KeyInfo (string name, bool isclustered, bool isPrimaryKey, bool isUnique, bool isConstraint, bool ignoreDupKey)
+		public KeyInfo (string name, bool isclustered, bool isPrimaryKey, bool isUnique, bool isConstraint, bool ignoreDupKey, byte fillFactor)
 		{
 			Name = name;
 			IsClustered = isclustered;
@@ -20,16 +21,18 @@ namespace CopyDb
 			IsUnique = isUnique;
 			IsConstraint = isConstraint;
 			IgnoreDupKey = ignoreDupKey;
+			FillFactor = fillFactor;
 		}
 
-		public KeyInfo (object name, object isclustered, object isPrimaryKey, object isUnique, object isConstraint, object ignoreDupKey)
+		public KeyInfo (object name, object isclustered, object isPrimaryKey, object isUnique, object isConstraint, object ignoreDupKey, object fillFactor)
 			: this(
 				(string) name,
 				(bool) isclustered,
 				(bool)isPrimaryKey,
 				(bool)isUnique,
 				(bool)isConstraint,
-				(bool)ignoreDupKey
+				(bool)ignoreDupKey,
+				(byte)fillFactor
 				)
 		{}
 	}
