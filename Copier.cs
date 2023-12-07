@@ -191,7 +191,7 @@ namespace CopyDb
 				{
 					LoadColumnInfo(dr, tables);
 					if (dr.NextResult())
-						LoadPrimaryKeyInfo(dr, tables);
+						LoadClusterInfo(dr, tables);
 				}
 			}
 			return tables;
@@ -220,21 +220,31 @@ namespace CopyDb
 			}
 		}
 
-		private static void LoadPrimaryKeyInfo(SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
+		private static void LoadClusterInfo(SqlDataReader dr, IDictionary<TableName, TableInfo> tables)
 		{
 			while (dr.Read())
 			{
 				TableName tablename = new TableName((string)dr["SchemaName"], (string)dr["TableName"]);
 				TableInfo table = LoadTableInfo(tables, tablename);
-				KeyInfo primarykey = table.PrimaryKey;
-				if (primarykey == null)
+				KeyInfo cluster = table.Cluster;
+				if (cluster == null)
 				{
-					primarykey = new KeyInfo(dr["ConstraintName"], dr["IsClustered"], dr["IsPrimaryKey"], dr["IsUnique"], dr["IsConstraint"]);
-					table.PrimaryKey = primarykey;
+					cluster = new KeyInfo(
+						dr["ConstraintName"],
+						dr["IsClustered"],
+						dr["IsPrimaryKey"],
+						dr["IsUnique"],
+						dr["IsConstraint"],
+						dr["IgnoreDupKey"],
+						dr["FillFactor"],
+						dr["PadIndex"],
+						dr["AllowRowLocks"],
+						dr["AllowPageLocks"]);
+					table.Cluster = cluster;
 				}
 				ColumnInfo column = table.Columns[table.ColumnIndex((string)dr["ColumnName"])];
 				column.IsDescending = dr["IsDescending"].Equals(1);
-				primarykey.Columns.Add(column);
+				cluster.Columns.Add(column);
 			}
 		}
 
@@ -296,7 +306,7 @@ namespace CopyDb
 
 		private static void WriteClusterDDL(TableInfo table, TextWriter writer)
 		{
-			var cluster = table.PrimaryKey;
+			var cluster = table.Cluster;
 			if (cluster == null) return;
 			if (cluster.IsConstraint)
 			{
@@ -308,7 +318,7 @@ namespace CopyDb
 					writer.Write(" unique");
 				writer.Write(cluster.IsClustered ? " clustered" : " nonclustered");
 				writer.Write(" (");
-				WritePrimaryKeyColumnsDDL(cluster.Columns, writer);
+				WriteClusterColumnsDDL(cluster.Columns, writer);
 				writer.Write(")");
 			}
 			else
@@ -320,12 +330,29 @@ namespace CopyDb
 				writer.Write(cluster.IsClustered ? " clustered" : " nonclustered");
 				writer.Write(" index [{1}] on {0}", table.Name, cluster.Name);
 				writer.Write(" (");
-				WritePrimaryKeyColumnsDDL(cluster.Columns, writer);
+				WriteClusterColumnsDDL(cluster.Columns, writer);
 				writer.Write(")");
 			}
+
+			// with (IGNORE_DUP_KEY={ON|OFF})
+			writer.Write(" with (");
+			writer.Write("IGNORE_DUP_KEY=");
+			writer.Write(cluster.IgnoreDupKey ? "ON" : "OFF");
+			if (cluster.FillFactor > 0)
+			{
+				writer.Write(",FILLFACTOR=");
+				writer.Write(cluster.FillFactor);
+			}
+			writer.Write(",PAD_INDEX=");
+			writer.Write(cluster.PadIndex ? "ON" : "OFF");
+			writer.Write(",ALLOW_ROW_LOCKS=");
+			writer.Write(cluster.AllowRowLocks ? "ON" : "OFF");
+			writer.Write(",ALLOW_PAGE_LOCKS=");
+			writer.Write(cluster.AllowPageLocks ? "ON" : "OFF");
+			writer.Write(")");
 		}
 
-		private static void WritePrimaryKeyColumnsDDL(IEnumerable<ColumnInfo> columns, TextWriter writer)
+		private static void WriteClusterColumnsDDL(IEnumerable<ColumnInfo> columns, TextWriter writer)
 		{
 			bool needcomma = false;
 			foreach (ColumnInfo column in columns)
